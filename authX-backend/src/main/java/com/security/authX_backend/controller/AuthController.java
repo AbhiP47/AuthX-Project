@@ -7,8 +7,10 @@ import com.security.authX_backend.entity.RefreshToken;
 import com.security.authX_backend.entity.User;
 import com.security.authX_backend.repository.RefreshTokenRepository;
 import com.security.authX_backend.repository.UserRepository;
+import com.security.authX_backend.security.CookieService;
 import com.security.authX_backend.security.JwtService;
 import com.security.authX_backend.service.ServiceImpl.AuthServiceImpl;
+import jakarta.servlet.http.HttpServletResponse;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,18 +37,20 @@ public class AuthController {
     private final JwtService jwtService;
     private final ModelMapper modelMapper;
     private  final RefreshTokenRepository refreshTokenRepository;
+    private final CookieService cookieService;
 
-    public AuthController(AuthServiceImpl authService, AuthenticationManager authenticationManager, UserRepository userRepository, JwtService jwtService, ModelMapper modelMapper, RefreshTokenRepository refreshTokenRepository) {
+    public AuthController(AuthServiceImpl authService, AuthenticationManager authenticationManager, UserRepository userRepository, JwtService jwtService, ModelMapper modelMapper, RefreshTokenRepository refreshTokenRepository, CookieService cookieService) {
         this.authService = authService;
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.modelMapper = modelMapper;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.cookieService = cookieService;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest loginRequest)
+    public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest loginRequest , HttpServletResponse response)
     {
         Authentication authentication =  authenticate(loginRequest);
         User user = userRepository.findByEmail(loginRequest.email()).orElseThrow(()-> new BadCredentialsException("Invalid Username or Password"));
@@ -67,6 +71,7 @@ public class AuthController {
         String refreshToken = jwtService.generateRefreshToken(user,refreshTokenObj.getJwtId());
 
         String accessToken = jwtService.generateToken(user);
+        cookieService.attachRefreshCookie(response,refreshToken,(int)jwtService.getRefreshTtlSeconds());
         TokenResponse tokenResponse = TokenResponse.of(accessToken,refreshToken,jwtService.getAccessTtlSeconds(),"Bearer",modelMapper.map(user,UserDto.class));
         return ResponseEntity.ok(tokenResponse);
     }
