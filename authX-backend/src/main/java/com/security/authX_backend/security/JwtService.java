@@ -5,6 +5,9 @@ import com.security.authX_backend.entity.Role;
 import com.security.authX_backend.entity.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +20,8 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
+@Getter
+@Setter
 public class JwtService {
 
     private final SecretKey key;
@@ -25,7 +30,7 @@ public class JwtService {
     private final String issuer;
 
     public JwtService(@Value("${security.jwt.secret}") String secret,
-                      @Value("${security.jwt.secret}") long accessTtlSeconds,
+                      @Value("${security.jwt.access-ttl-seconds}") long accessTtlSeconds,
                       @Value("${security.jwt.refresh-ttl-seconds}") long refreshTtlSeconds,
                       @Value("${security.jwt.issuer}") String issuer) {
         if(secret == null || secret.length()<64)
@@ -52,7 +57,7 @@ public class JwtService {
                         "roles",roles,
                         "type","access"
                 ))
-                .signWith(key , SignatureAlgorithm.ES512)
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
 
     }
@@ -69,7 +74,7 @@ public class JwtService {
                 .claims(Map.of(
                         "type","refresh"
                 ))
-                .signWith(key , SignatureAlgorithm.ES512)
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 

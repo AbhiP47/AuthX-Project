@@ -1,9 +1,20 @@
 package com.security.authX_backend.controller;
 
+import com.security.authX_backend.dto.LoginRequest;
+import com.security.authX_backend.dto.TokenResponse;
 import com.security.authX_backend.dto.UserDto;
+import com.security.authX_backend.entity.User;
+import com.security.authX_backend.repository.UserRepository;
+import com.security.authX_backend.security.JwtService;
 import com.security.authX_backend.service.ServiceImpl.AuthServiceImpl;
+import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,11 +25,38 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthServiceImpl authService;
+    private final AuthenticationManager authenticationManager;
+    private  final UserRepository userRepository;
+    private final JwtService jwtService;
+    private final ModelMapper modelMapper;
 
-    public AuthController(AuthServiceImpl authService) {
+    public AuthController(AuthServiceImpl authService, AuthenticationManager authenticationManager, UserRepository userRepository, JwtService jwtService, ModelMapper modelMapper) {
         this.authService = authService;
+        this.authenticationManager = authenticationManager;
+        this.userRepository = userRepository;
+        this.jwtService = jwtService;
+        this.modelMapper = modelMapper;
     }
 
+    @PostMapping("/login")
+    public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest loginRequest)
+    {
+        Authentication authentication =  authenticate(loginRequest);
+        User user = userRepository.findByEmail(loginRequest.email()).orElseThrow(()-> new BadCredentialsException("Invalid Username or Password"));
+        if(!user.isEnable())
+        {
+            throw  new DisabledException("User is Disabled");
+        }
+        String accessToken = jwtService.generateToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user, jwtService.getJwtId(accessToken));
+        TokenResponse tokenResponse = TokenResponse.of(accessToken,refreshToken,jwtService.getAccessTtlSeconds(),"Bearer",modelMapper.map(user,UserDto.class));
+        return ResponseEntity.ok(tokenResponse);
+    }
+
+    public Authentication authenticate(LoginRequest loginRequest)
+    {
+        return authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password()));
+    }
 
     @PostMapping("/register")
     public ResponseEntity<UserDto> registerUser(@RequestBody UserDto userDto)
