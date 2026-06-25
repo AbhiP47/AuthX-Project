@@ -6,7 +6,8 @@ target/
 
 application.yaml
 application-dev.yaml
-application-prod.
+application-prod.yaml
+.env
 .idea
 
 ### STS ###
